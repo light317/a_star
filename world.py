@@ -8,6 +8,11 @@ class Grid:
                        for x in range(width)] for y in range(height)]
         self.start_cell = self.cells[0][0]
         self.end_cell = self.cells[0][0]
+        self.discovered_nodes = [self.start_cell]
+        self.path = []
+        self.true_path = []
+        self.completed_path = False
+        self.first_run = True
 
     def get_cells(self):
         return self.cells
@@ -25,11 +30,13 @@ class Grid:
         self.validate_cell_position(pos)
         self.cells[pos[1]][pos[0]].state = cell.CellState.START
         self.start_cell = self.cells[pos[1]][pos[0]]
+        self.first_run = True
 
     def set_end_cell(self, pos: (int, int)):
         self.validate_cell_position(pos)
         self.cells[pos[1]][pos[0]].state = cell.CellState.END
         self.end_cell = self.cells[pos[1]][pos[0]]
+        self.first_run = True
 
     def set_cell_type(self, pos: (int, int), type: cell.CellType):
         self.validate_cell_position(pos)
@@ -110,9 +117,10 @@ class Grid:
     def reset_scores(self):
         for y, row in enumerate(self.cells):
             for x, c in enumerate(row):
-                self.cells[y][x].g_score = 0
+                self.cells[y][x].g_score = 10000000
                 self.cells[y][x].h_score = 10000000
                 self.cells[y][x].f_score = 10000000
+                self.cells[y][x].state = cell.CellState.UNTOUCHED
 
     def start_a_star(self):
         self.reset_scores()
@@ -124,6 +132,7 @@ class Grid:
         start_cell.g_score = 0
         start_cell.f_score = h
         self.cells[start_cell.y][start_cell.x].f_score = h
+        self.cells[start_cell.y][start_cell.x].g_score = 0
         discovered_nodes = [start_cell]
         # came_from = []
 
@@ -146,6 +155,9 @@ class Grid:
                 print("!!! SOLVED !!!")
                 path = self.reconstruct_path(start_cell, current)
                 for node in path:
+                    # if (node.equals(start_cell) or node.equals(end_cell)):
+                    #     continue
+
                     self.cells[node.y][node.x].state = cell.CellState.PATH
                     node.state = cell.CellState.PATH
                 return
@@ -164,12 +176,13 @@ class Grid:
                 tentative_g_score = current.g_score + \
                     self.get_g_score(current, neighbor)
 
-                self.cells[neighbor.y][neighbor.x].state = cell.CellState.VISITED
-                neighbor.state = cell.CellState.VISITED
+                # self.cells[neighbor.y][neighbor.x].state = cell.CellState.VISITED
+                # neighbor.state = cell.CellState.VISITED
 
-                # print(neighbor, " g score: ", tentative_g_score)
+                # print(neighbor, "g score: ", neighbor.g_score)
+                # print(neighbor, "tentative g score: ", tentative_g_score)
 
-                if tentative_g_score < neighbor.g_score or neighbor.g_score == 0:
+                if tentative_g_score < neighbor.g_score:
                     self.cells[neighbor.y][neighbor.x].state = cell.CellState.COMPUTED
                     neighbor.state = cell.CellState.COMPUTED
 
@@ -179,9 +192,88 @@ class Grid:
                         self.get_chebyshev_distance(self.end_cell, neighbor)
 
                     if neighbor not in discovered_nodes:
-                        print("Adding neighbor ", neighbor,
-                              "f score: ", neighbor.f_score)
+                        # print("Adding neighbor ", neighbor,
+                        #       "f score: ", neighbor.f_score)
                         discovered_nodes.append(neighbor)
 
         print("!!! FAILED !!!")
         return []
+
+    def clear_path(self):
+        for node in self.path:
+            self.cells[node.y][node.x].state = cell.CellState.COMPUTED
+        self.path = []
+
+    def interate_a_star(self):
+        h: int = self.get_chebyshev_distance(self.start_cell, self.end_cell)
+
+        if self.first_run:
+            self.reset_scores()
+
+            self.start_cell.g_score = 0
+            self.start_cell.f_score = h
+            self.cells[self.start_cell.y][self.start_cell.x].f_score = h
+            self.cells[self.start_cell.y][self.start_cell.x].g_score = 0
+            self.discovered_nodes = [self.start_cell]
+            self.path = []
+
+            self.first_run = False
+            self.completed_path = False
+
+        # if not self.completed_path:
+        #     self.clear_path()
+
+        if len(self.discovered_nodes) == 0:
+            print("empty discovered_nodes")
+            return
+
+        print("In main algo loop: ", len(self.discovered_nodes), " nodes.")
+
+        current = self.get_cell_with_lowest_f(self.discovered_nodes)
+
+        print("Curent cell: ", current)
+
+        if not current.equals(self.start_cell):
+            self.path = self.reconstruct_path(self.start_cell, current)
+
+        for node in self.path:
+            self.cells[node.y][node.x].state = cell.CellState.PATH
+            node.state = cell.CellState.PATH
+
+        if current.equals(self.end_cell):
+            print("!!! SOLVED !!!")
+            self.completed_path = True
+            self.true_path = self.reconstruct_path(self.start_cell, current)
+            for node in self.true_path:
+                self.cells[node.y][node.x].state = cell.CellState.DONE
+
+            return
+
+        current_cell_neighbors = self.get_all_valid_neighbors(current)
+
+        self.discovered_nodes.remove(current)
+        print("remove current.")
+        print("Existing", len(self.discovered_nodes), " nodes.")
+
+        for neighbor in current_cell_neighbors:
+            if neighbor.type == cell.CellType.WALL:
+                continue
+
+            tentative_g_score = current.g_score + \
+                self.get_g_score(current, neighbor)
+
+            if tentative_g_score < neighbor.g_score:
+                self.cells[neighbor.y][neighbor.x].state = cell.CellState.COMPUTED
+                neighbor.state = cell.CellState.COMPUTED
+
+                neighbor.came_from = current
+                neighbor.g_score = tentative_g_score
+                neighbor.f_score = tentative_g_score + \
+                    self.get_chebyshev_distance(self.end_cell, neighbor)
+
+                if neighbor not in self.discovered_nodes:
+                    print("Adding neighbor ", neighbor,
+                          "f score: ", neighbor.f_score)
+                    self.discovered_nodes.append(neighbor)
+        # print("!!! FAILED !!!")
+        # return []

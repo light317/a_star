@@ -4,6 +4,7 @@ import argparse
 import sys
 import colors
 from pygame.locals import *
+import time
 
 
 pygame.display.set_caption('Life')
@@ -45,8 +46,13 @@ def run(screen: pygame.Surface, grid: world.Grid):
                     grid.set_end_cell(
                         (mouse_rect_x, mouse_rect_y))
 
-        grid.start_a_star()
+                if event.key == pygame.K_w:
+                    grid.set_cell_type((mouse_rect_x, mouse_rect_y), world.cell.CellType.WALL)
+
+        # grid.start_a_star()
+        grid.interate_a_star()
         draw(screen, grid)
+        # time.sleep(0.05)
 
 
 def draw_grid_from_array(screen: pygame.Surface, grid: world.Grid):
@@ -59,10 +65,17 @@ def draw_grid_from_array(screen: pygame.Surface, grid: world.Grid):
             pygame.draw.rect(screen, color, (x * cell_size,
                              y * cell_size, cell_size - 2, cell_size-2))
 
-            screen.blit(font.render(
-                f"{cell.f_score}", True, colors.red, color), (x*cell_size, y*cell_size))
+            # screen.blit(font.render(
+            #     f"{cell.f_score}", True, colors.red, color), (x*cell_size, y*cell_size))
             # pygame.draw.rect(screen, black, (x * cell_size, y *
             #                  cell_size, cell_size, cell_size), 1)  # grid lines
+            if cell.equals(grid.start_cell):
+                screen.blit(font.render(
+                    f"START", True, colors.red, color), (x*cell_size, y*cell_size))
+
+            if cell.equals(grid.end_cell):
+                screen.blit(font.render(
+                    f"END", True, colors.red, color), (x*cell_size, y*cell_size))
 
 
 def draw(screen: pygame.Surface, grid: world.Grid):

@@ -59,6 +59,8 @@ class Cell:
                 return colors.red
             case CellState.END:
                 return colors.red
+            case CellState.DONE:
+                return colors.yellow
             case _:
                 return colors.white
 
